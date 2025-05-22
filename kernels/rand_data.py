@@ -16,7 +16,7 @@ def generate_dummy_data(
     torch.manual_seed(42)
 
     x = torch.randn((batch_size, seq_len, nheads, headdim), dtype=dtype, device=device)
-    A = torch.rand((nheads,), dtype=dtype, device=device) * 0.05 + 0.95 # sensitive
+    A = torch.rand((nheads,), dtype=dtype, device=device) * -1 # sensitive
     B = torch.randn((batch_size, seq_len, n_groups, dstate), dtype=dtype, device=device)
     C = torch.randn((batch_size, seq_len, n_groups, dstate), dtype=dtype, device=device)
     D = torch.randn((nheads,), dtype=dtype, device=device)

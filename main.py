@@ -106,7 +106,7 @@ def _mamba_chunk_scan_combined_fwd_concurrent(x, dt, A, B, C, chunk_size, D=None
 
 
 
-def check_same_tensors(t1, t2):
+def check_same_tensors(t1, t2, tensor_name):
     if t1 is None and t2 is None:
         return True
     elif t1 is None:
@@ -128,19 +128,37 @@ def check_same_tensors(t1, t2):
             indices = [not_close_indices[d][i].item() for d in range(len(not_close_indices))]
             print(f"mismatch {i} at index{indices} has {t1[*indices]} vs {t2[*indices]}")
             # print(f"mismatch {i}: {not_close_indices[i].tolist()} vs {not_close_indices[i].tolist()}")
+    else:
+        # print a few values from the middle
+        flat1 = t1.reshape(-1).tolist()
+        flat2 = t2.reshape(-1).tolist()
+        elem_count = len(flat1)
+        midpoint = elem_count // 2
+        list1 = flat1[midpoint:midpoint+4]
+        list2 = flat2[midpoint:midpoint+4]
+        list1 = ["{:.4f}".format(item) for item in list1]
+        list2 = ["{:.4f}".format(item) for item in list2]
+        print(f"    {tensor_name} tensors match, example elems: t1: ...{list1}... vs t2: ...{list2}...")
 
     return num_mismatch == 0
 
 def check_same_results(res1, res2):
     tuple_count = len(res1)
-    print(f"comparing {tuple_count} tensors")
+    print(f"    comparing {tuple_count} tensors")
     all_match = True
+    tensor_names = ["out", "out_x", "dt", "dA_cumsum", "states", "final_states"]
     for i in range(tuple_count):
-        this_match = check_same_tensors(res1[i], res2[i])
+        this_match = check_same_tensors(res1[i], res2[i], tensor_names[i])
         all_match = all_match and this_match
         if not this_match:
             print(f"result {i} does not match")
-    print(f"results{" do not" if not all_match else ""} match")
+    if all_match:
+        print("results match")
+    else:
+        print("RESULTS DO NOT MATCH")
+
+    return all_match
+
 
 
 if __name__ == '__main__':
@@ -150,13 +168,23 @@ if __name__ == '__main__':
     print("got random test tensors")
     original_res = _mamba_chunk_scan_combined_fwd_original(x, dt, A, B, C, chunk_size, D, dt_bias=dt_bias)
     print("ran original")
-    check_same_results(original_res, original_res)
-    print("checked original vs itself")
+    print("--------------------checking...")
+    original_match = check_same_results(original_res, original_res)
+    print("--------------------checked original vs itself")
     globalbar_res = _mamba_chunk_scan_combined_fwd_globalbar(x, dt, A, B, C, chunk_size, D, dt_bias=dt_bias)
     print("ran globalbar")
-    check_same_results(globalbar_res, original_res)
-    print("checked globalbar vs original")
+    print("--------------------checking...")
+    globalbar_match = check_same_results(globalbar_res, original_res)
+    print("--------------------checked globalbar vs original")
     concurrent_res = _mamba_chunk_scan_combined_fwd_concurrent(x, dt, A, B, C, chunk_size, D, dt_bias=dt_bias)
     print("ran concurrent")
-    check_same_results(concurrent_res, original_res)
-    print("checked concurrent vs original")
+    print("--------------------checking...")
+    concurrent_match = check_same_results(concurrent_res, original_res)
+    print("--------------------checked concurrent vs original")
+    print("----------------------------------------")
+    print("----------------------------------------")
+    print("results:", "all good" if original_match and globalbar_match and concurrent_match else "bad")
+    print("original matches itself: ", original_match)
+    print("global barrier fused matches original: ", globalbar_match)
+    print("concurrent fused matches original: ", concurrent_match)
+    print("----------------------------------------")
